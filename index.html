@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地圖與指南針：方向小探險</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans HK', sans-serif;
+            background-color: #fcf4d9; /* 復古地圖底色 */
+            background-image: radial-gradient(#d3b88b 1px, transparent 1px);
+            background-size: 20px 20px;
+            color: #4a3b2c;
+            overflow-x: hidden;
+        }
+
+        .map-container {
+            background-color: rgba(255, 250, 235, 0.9);
+            border: 8px solid #8b5a2b;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        /* 裝飾性地圖元素 */
+        .map-decoration {
+            position: absolute;
+            opacity: 0.15;
+            pointer-events: none;
+        }
+        .compass-rose {
+            top: 20px;
+            right: 20px;
+            font-size: 100px;
+            color: #8b5a2b;
+        }
+        .ship {
+            bottom: 30px;
+            left: 30px;
+            font-size: 80px;
+            color: #8b5a2b;
+        }
+
+        /* 按鈕樣式 */
+        .btn-primary {
+            background: linear-gradient(145deg, #e6a84f, #c78933);
+            color: white;
+            border: 4px solid #8b5a2b;
+            box-shadow: 0 6px 0 #8b5a2b, 0 10px 10px rgba(0,0,0,0.2);
+            transition: all 0.1s;
+        }
+        .btn-primary:active {
+            transform: translateY(6px);
+            box-shadow: 0 0px 0 #8b5a2b, 0 4px 4px rgba(0,0,0,0.2);
+        }
+        .btn-primary:hover {
+            filter: brightness(1.1);
+        }
+
+        .btn-option {
+            background: #fffdf5;
+            color: #4a3b2c;
+            border: 3px solid #bda88a;
+            transition: all 0.2s;
+        }
+        .btn-option:hover {
+            background: #f4e8c1;
+            transform: scale(1.02);
+        }
+        .btn-option.correct {
+            background: #a8d5ba;
+            border-color: #4ca168;
+            color: #1b4d2e;
+        }
+        .btn-option.wrong {
+            background: #f5b7b1;
+            border-color: #d9534f;
+            color: #7a2320;
+        }
+
+        /* 抽籤機動畫 */
+        .slot-machine {
+            background: #fff;
+            border: 4px solid #8b5a2b;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 60px;
+            display: inline-block;
+            vertical-align: middle;
+            min-width: 80px;
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .slot-content {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #d35400;
+            line-height: 60px;
+            text-align: center;
+            transition: transform 0.1s cubic-bezier(0.1, 0.7, 1.0, 0.1);
+        }
+        .slot-rolling {
+            animation: roll 0.1s linear infinite;
+        }
+        @keyframes roll {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-100%); }
+        }
+
+        /* 動畫類別 */
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 證書樣式 */
+        .certificate {
+            background: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M0,0 L100,0 L100,100 L0,100 Z" fill="%23fdf9eb"/><path d="M5,5 L95,5 L95,95 L5,95 Z" fill="none" stroke="%23c78933" stroke-width="2"/><path d="M10,10 L90,10 L90,90 L10,90 Z" fill="none" stroke="%238b5a2b" stroke-width="4"/></svg>') center/cover;
+            border: 1px solid #8b5a2b;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        /* 隱藏元素 */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="map-container w-full max-w-4xl p-6 md:p-10 relative">
+        <i class="fa-regular fa-compass map-decoration compass-rose"></i>
+        <i class="fa-solid fa-sailboat map-decoration ship"></i>
+
+        <!-- 頁面 1：活動簡介 -->
+        <div id="page-intro" class="text-center fade-in">
+            <h1 class="text-4xl md:text-5xl font-black mb-6 text-[#8b5a2b] drop-shadow-md">
+                🧭 地圖與指南針 🗺️<br><span class="text-3xl text-[#c78933]">方向小探險</span>
+            </h1>
+            <div class="bg-white/60 p-6 rounded-xl border-2 border-[#d3b88b] mb-8 inline-block text-left">
+                <h2 class="text-2xl font-bold mb-4 text-center">📜 探險任務說明</h2>
+                <p class="text-lg mb-2">歡迎來到二年級方向訓練營！</p>
+                <p class="text-lg mb-2">你需要利用指南針，完成兩項挑戰：</p>
+                <ul class="list-disc list-inside text-lg mb-4 ml-4 space-y-2">
+                    <li><strong>挑戰一：</strong> 面向一個方向，找出你的左、右或後方是什麼方向。</li>
+                    <li><strong>挑戰二：</strong> 面向一個方向，轉動數個直角後，找出你面對的方向。</li>
+                </ul>
+                <p class="text-lg font-bold text-center text-red-600 mt-4">滿分探險家將獲得特別證書！</p>
+            </div>
+            <br>
+            <button onclick="showPage('page-select')" class="btn-primary text-2xl font-bold py-4 px-10 rounded-full cursor-pointer">
+                開始探險 <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+
+        <!-- 頁面 2：題型選擇 -->
+        <div id="page-select" class="text-center hidden fade-in">
+            <h2 class="text-4xl font-bold mb-10 text-[#8b5a2b]">你想挑戰哪一關？</h2>
+            <div class="flex flex-col md:flex-row gap-8 justify-center">
+                <div class="bg-white/80 p-8 rounded-2xl border-4 border-[#c78933] flex-1 cursor-pointer hover:bg-[#fff9e6] transition-colors" onclick="startGame(1)">
+                    <i class="fa-solid fa-arrows-up-down-left-right text-6xl text-[#d35400] mb-4"></i>
+                    <h3 class="text-3xl font-bold mb-2">關卡一</h3>
+                    <p class="text-xl">相對方向挑戰<br>(前/後/左/右)</p>
+                </div>
+                <div class="bg-white/80 p-8 rounded-2xl border-4 border-[#c78933] flex-1 cursor-pointer hover:bg-[#fff9e6] transition-colors" onclick="startGame(2)">
+                    <i class="fa-solid fa-rotate-right text-6xl text-[#2980b9] mb-4"></i>
+                    <h3 class="text-3xl font-bold mb-2">關卡二</h3>
+                    <p class="text-xl">轉向直角挑戰<br>(左轉/右轉)</p>
+                </div>
+            </div>
+            <button onclick="showPage('page-intro')" class="mt-10 px-6 py-2 bg-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-400 cursor-pointer">返回首頁</button>
+        </div>
+
+        <!-- 頁面 3：遊戲介面 -->
+        <div id="page-game" class="hidden fade-in">
+            <!-- 頂部資訊列 -->
+            <div class="flex justify-between items-center mb-6 bg-[#8b5a2b] text-white p-3 rounded-lg font-bold text-lg">
+                <div><i class="fa-solid fa-bars-progress"></i> 第 <span id="question-count">1</span>/5 題</div>
+                <div class="text-center flex-1" id="game-title">關卡一：相對方向</div>
+                <div><i class="fa-solid fa-star text-yellow-300"></i> 分數: <span id="score">0</span></div>
+            </div>
+
+            <!-- 問題區域 -->
+            <div class="bg-white p-8 rounded-xl border-2 border-[#d3b88b] text-center mb-8 shadow-inner min-h-[250px] flex flex-col justify-center">
+                
+                <!-- 抽籤機 UI -->
+                <div id="slot-machine-area" class="mb-6 flex flex-wrap justify-center items-center gap-4 text-2xl">
+                    <span>我面向</span>
+                    <div class="slot-machine w-20">
+                        <div id="slot-dir1" class="slot-content">東</div>
+                    </div>
+                    
+                    <!-- 類型 1 的抽籤 -->
+                    <span id="type1-text" class="hidden">方，我的</span>
+                    <div id="slot-machine-type1" class="slot-machine w-20 hidden">
+                        <div id="slot-rel-dir" class="slot-content">後</div>
+                    </div>
+                    <span id="type1-end-text" class="hidden">方是哪裡？</span>
+
+                    <!-- 類型 2 的抽籤 -->
+                    <span id="type2-text1" class="hidden">方，向</span>
+                    <div id="slot-machine-type2-turn" class="slot-machine w-24 hidden">
+                        <div id="slot-turn" class="slot-content">右轉</div>
+                    </div>
+                    <div id="slot-machine-type2-angle" class="slot-machine w-16 hidden">
+                        <div id="slot-angle" class="slot-content">1</div>
+                    </div>
+                    <span id="type2-text2" class="hidden">個直角，我現在面向哪裡？</span>
+                </div>
+
+                <div id="draw-btn-area">
+                    <button id="btn-draw" onclick="startDraw()" class="btn-primary text-xl font-bold py-3 px-8 rounded-full cursor-pointer animate-pulse">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> 點擊抽題目！
+                    </button>
+                </div>
+
+                <!-- 問題文字顯示 (抽籤後) -->
+                <h3 id="question-text" class="text-3xl font-bold text-[#4a3b2c] hidden leading-relaxed"></h3>
+                
+                <!-- 解釋區域 -->
+                <div id="explanation-area" class="hidden mt-6 p-4 bg-yellow-100 rounded-lg text-left text-lg border-l-4 border-yellow-500">
+                    <strong>💡 小提示：</strong> <span id="explanation-text"></span>
+                </div>
+            </div>
+
+            <!-- 選項區域 -->
+            <div id="options-area" class="grid grid-cols-2 gap-4 hidden">
+                <button class="btn-option text-2xl font-bold py-4 rounded-xl cursor-pointer" onclick="checkAnswer('東')">東</button>
+                <button class="btn-option text-2xl font-bold py-4 rounded-xl cursor-pointer" onclick="checkAnswer('南')">南</button>
+                <button class="btn-option text-2xl font-bold py-4 rounded-xl cursor-pointer" onclick="checkAnswer('西')">西</button>
+                <button class="btn-option text-2xl font-bold py-4 rounded-xl cursor-pointer" onclick="checkAnswer('北')">北</button>
+            </div>
+
+            <!-- 下一題按鈕 -->
+            <div id="next-btn-area" class="text-center mt-6 hidden">
+                <button onclick="nextQuestion()" class="btn-primary text-xl font-bold py-3 px-10 rounded-full cursor-pointer">
+                    下一題 <i class="fa-solid fa-forward"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 頁面 4：結果與證書 -->
+        <div id="page-result" class="hidden fade-in flex flex-col items-center">
+            
+            <div id="normal-result" class="text-center w-full">
+                <h2 class="text-4xl font-bold mb-6 text-[#8b5a2b]">探險完成！</h2>
+                <div class="bg-white p-8 rounded-2xl border-4 border-[#d3b88b] mb-8 inline-block w-full max-w-md">
+                    <p class="text-2xl mb-4">你的得分：<span id="final-score" class="font-bold text-3xl text-red-600">0</span> / 5</p>
+                    <p class="text-xl mb-4 text-gray-600"><i class="fa-regular fa-clock"></i> 完成時間：<span id="time-taken">0</span> 秒</p>
+                    <p id="result-message" class="text-xl font-bold mt-6 text-[#c78933]"></p>
+                </div>
+            </div>
+
+            <!-- 滿分證書 -->
+            <div id="certificate-area" class="hidden w-full max-w-2xl">
+                <div class="certificate p-10 text-center relative">
+                    <i class="fa-solid fa-award text-6xl text-yellow-500 absolute top-8 left-8"></i>
+                    <i class="fa-solid fa-award text-6xl text-yellow-500 absolute top-8 right-8"></i>
+                    <h1 class="text-4xl font-black text-[#8b5a2b] mb-2 mt-4 tracking-widest">榮譽證書</h1>
+                    <h3 class="text-xl text-[#c78933] mb-8 border-b-2 border-[#c78933] inline-block pb-2">二年級方向探險家</h3>
+                    
+                    <p class="text-2xl mb-6">特此證明</p>
+                    <p class="text-3xl font-bold text-red-600 mb-6">優秀小神童</p>
+                    <p class="text-lg mb-8 px-10">在「地圖與指南針：方向小探險」中，<br>展現出卓越的方向感，以滿分成績完成所有挑戰！</p>
+                    
+                    <div class="flex justify-between items-end mt-12 px-10">
+                        <div class="text-left border-t border-gray-400 pt-2 w-32">
+                            <p class="text-sm text-gray-600 text-center">日期</p>
+                            <p class="text-md font-bold text-center" id="cert-date"></p>
+                        </div>
+                        <div class="text-center">
+                            <i class="fa-solid fa-stamp text-red-500 text-5xl opacity-80 transform -rotate-12"></i>
+                        </div>
+                        <div class="text-right border-t border-gray-400 pt-2 w-32">
+                            <p class="text-sm text-gray-600 text-center">校長/老師</p>
+                            <p class="text-md font-bold text-center italic">數學部</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-10 flex gap-4">
+                <button onclick="resetApp()" class="btn-primary text-xl font-bold py-3 px-8 rounded-full cursor-pointer">
+                    <i class="fa-solid fa-rotate-left"></i> 再玩一次
+                </button>
+                <button onclick="showPage('page-intro')" class="px-6 py-3 bg-white border-2 border-[#8b5a2b] text-[#8b5a2b] font-bold rounded-full hover:bg-gray-100 cursor-pointer">
+                    <i class="fa-solid fa-house"></i> 回主畫面
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 遊戲狀態變數
+        const dirs = ['東', '南', '西', '北'];
+        const relDirs = ['左', '右', '後'];
+        const turns = ['左轉', '右轉'];
+        const angles = ['1', '2', '3'];
+
+        // 方向陣列用於計算 (順時針: 東->南->西->北)
+        // 索引: 0:東, 1:南, 2:西, 3:北
+        
+        let currentType = 1;
+        let currentQ = 1;
+        let score = 0;
+        let startTime = 0;
+        let currentAnswer = "";
+        
+        // 當前題目的抽籤結果
+        let drawnFaceDir = "";
+        let drawnRelDir = "";
+        let drawnTurn = "";
+        let drawnAngle = "";
+
+        let isDrawing = false;
+        let isAnswered = false;
+
+        // 顯示指定頁面
+        function showPage(pageId) {
+            document.getElementById('page-intro').classList.add('hidden');
+            document.getElementById('page-select').classList.add('hidden');
+            document.getElementById('page-game').classList.add('hidden');
+            document.getElementById('page-result').classList.add('hidden');
+            
+            document.getElementById(pageId).classList.remove('hidden');
+        }
+
+        // 開始遊戲
+        function startGame(type) {
+            currentType = type;
+            currentQ = 1;
+            score = 0;
+            startTime = Date.now();
+            
+            document.getElementById('game-title').innerText = type === 1 ? "關卡一：相對方向" : "關卡二：轉向直角";
+            document.getElementById('score').innerText = score;
+            
+            setupQuestionUI();
+            showPage('page-game');
+        }
+
+        // 設定題目 UI 狀態 (準備抽籤前)
+        function setupQuestionUI() {
+            document.getElementById('question-count').innerText = currentQ;
+            document.getElementById('options-area').classList.add('hidden');
+            document.getElementById('next-btn-area').classList.add('hidden');
+            document.getElementById('explanation-area').classList.add('hidden');
+            document.getElementById('question-text').classList.add('hidden');
+            document.getElementById('draw-btn-area').classList.remove('hidden');
+            document.getElementById('slot-machine-area').classList.remove('hidden');
+            
+            // 重置選項按鈕樣式
+            const btns = document.querySelectorAll('.btn-option');
+            btns.forEach(btn => {
+                btn.classList.remove('correct', 'wrong');
+                btn.disabled = false;
+            });
+
+            // 根據題型設定抽籤機顯示
+            if (currentType === 1) {
+                document.getElementById('type1-text').classList.remove('hidden');
+                document.getElementById('slot-machine-type1').classList.remove('hidden');
+                document.getElementById('type1-end-text').classList.remove('hidden');
+                
+                document.getElementById('type2-text1').classList.add('hidden');
+                document.getElementById('slot-machine-type2-turn').classList.add('hidden');
+                document.getElementById('slot-machine-type2-angle').classList.add('hidden');
+                document.getElementById('type2-text2').classList.add('hidden');
+            } else {
+                document.getElementById('type1-text').classList.add('hidden');
+                document.getElementById('slot-machine-type1').classList.add('hidden');
+                document.getElementById('type1-end-text').classList.add('hidden');
+                
+                document.getElementById('type2-text1').classList.remove('hidden');
+                document.getElementById('slot-machine-type2-turn').classList.remove('hidden');
+                document.getElementById('slot-machine-type2-angle').classList.remove('hidden');
+                document.getElementById('type2-text2').classList.remove('hidden');
+            }
+
+            // 重置抽籤機文字
+            document.getElementById('slot-dir1').innerText = "?";
+            if(currentType === 1) document.getElementById('slot-rel-dir').innerText = "?";
+            if(currentType === 2) {
+                document.getElementById('slot-turn').innerText = "?";
+                document.getElementById('slot-angle').innerText = "?";
+            }
+            
+            isAnswered = false;
+        }
+
+        // 開始抽籤動畫
+        function startDraw() {
+            if (isDrawing) return;
+            isDrawing = true;
+            document.getElementById('draw-btn-area').classList.add('hidden');
+
+            // 準備假數據用於滾動
+            let rollIntervals = [];
+            
+            // 面向方向抽籤
+            const slotDir1 = document.getElementById('slot-dir1');
+            slotDir1.innerHTML = `<div class="slot-rolling">${dirs.join('<br>')}<br>${dirs[0]}</div>`;
+            
+            if (currentType === 1) {
+                const slotRel = document.getElementById('slot-rel-dir');
+                slotRel.innerHTML = `<div class="slot-rolling">${relDirs.join('<br>')}<br>${relDirs[0]}</div>`;
+            } else {
+                const slotTurn = document.getElementById('slot-turn');
+                slotTurn.innerHTML = `<div class="slot-rolling">${turns.join('<br>')}<br>${turns[0]}</div>`;
+                const slotAngle = document.getElementById('slot-angle');
+                slotAngle.innerHTML = `<div class="slot-rolling">${angles.join('<br>')}<br>${angles[0]}</div>`;
+            }
+
+            // 模擬抽籤過程，2秒後停止
+            setTimeout(() => {
+                finishDraw();
+            }, 1500);
+        }
+
+        // 結束抽籤，計算答案
+        function finishDraw() {
+            // 隨機抽取結果
+            drawnFaceDir = dirs[Math.floor(Math.random() * dirs.length)];
+            document.getElementById('slot-dir1').innerHTML = drawnFaceDir;
+
+            if (currentType === 1) {
+                drawnRelDir = relDirs[Math.floor(Math.random() * relDirs.length)];
+                document.getElementById('slot-rel-dir').innerHTML = drawnRelDir;
+                
+                // 計算類型一答案
+                currentAnswer = calculateAnswerType1(drawnFaceDir, drawnRelDir);
+                document.getElementById('question-text').innerText = `我面向${drawnFaceDir}方，我的${drawnRelDir}方是哪裡？`;
+                
+            } else {
+                drawnTurn = turns[Math.floor(Math.random() * turns.length)];
+                drawnAngle = angles[Math.floor(Math.random() * angles.length)];
+                document.getElementById('slot-turn').innerHTML = drawnTurn;
+                document.getElementById('slot-angle').innerHTML = drawnAngle;
+                
+                // 計算類型二答案
+                currentAnswer = calculateAnswerType2(drawnFaceDir, drawnTurn, parseInt(drawnAngle));
+                document.getElementById('question-text').innerText = `我面向${drawnFaceDir}方，向${drawnTurn}${drawnAngle}個直角，我現在面向哪裡？`;
+            }
+
+            isDrawing = false;
+            
+            // 顯示問題文字和選項
+            setTimeout(() => {
+                document.getElementById('slot-machine-area').classList.add('hidden');
+                document.getElementById('question-text').classList.remove('hidden');
+                document.getElementById('options-area').classList.remove('hidden');
+            }, 500);
+        }
+
+        // 計算第一類答案：前(同向), 後(對立), 左(逆時針90), 右(順時針90)
+        function calculateAnswerType1(faceDir, relDir) {
+            const dirIndex = dirs.indexOf(faceDir); // 0:東, 1:南, 2:西, 3:北
+            let ansIndex = dirIndex;
+
+            if (relDir === '後') {
+                ansIndex = (dirIndex + 2) % 4; // 加 180 度 (兩個位置)
+            } else if (relDir === '右') {
+                ansIndex = (dirIndex + 1) % 4; // 順時針 90 度 (加一個位置)
+            } else if (relDir === '左') {
+                ansIndex = (dirIndex + 3) % 4; // 逆時針 90 度 (相當於順時針加三個位置)
+            }
+            return dirs[ansIndex];
+        }
+
+        // 計算第二類答案：轉動直角
+        function calculateAnswerType2(faceDir, turnDir, numAngles) {
+            const dirIndex = dirs.indexOf(faceDir);
+            let ansIndex = dirIndex;
+
+            // 每個直角是 90 度 (一個位置)
+            if (turnDir === '右轉') {
+                ansIndex = (dirIndex + numAngles) % 4;
+            } else if (turnDir === '左轉') {
+                // 為了避免負數取餘數問題，加4再取餘
+                ansIndex = (dirIndex - numAngles + 4 * numAngles) % 4; 
+            }
+            return dirs[ansIndex];
+        }
+
+        // 檢查答案
+        function checkAnswer(selectedAns) {
+            if (isAnswered) return;
+            isAnswered = true;
+
+            const btns = document.querySelectorAll('.btn-option');
+            
+            // 停用所有按鈕並標示正確答案
+            btns.forEach(btn => {
+                btn.disabled = true;
+                if (btn.innerText === currentAnswer) {
+                    btn.classList.add('correct');
+                }
+            });
+
+            const explanationArea = document.getElementById('explanation-area');
+            const explanationText = document.getElementById('explanation-text');
+            
+            if (selectedAns === currentAnswer) {
+                // 答對
+                score++;
+                document.getElementById('score').innerText = score;
+                // 播放小煙火
+                confetti({
+                    particleCount: 50,
+                    spread: 60,
+                    origin: { y: 0.6 },
+                    colors: ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff']
+                });
+            } else {
+                // 答錯
+                event.target.classList.add('wrong');
+                explanationArea.classList.remove('hidden');
+                
+                // 產生解釋
+                if (currentType === 1) {
+                    explanationText.innerText = `想像你站著面向${drawnFaceDir}方。按照東南西北順時針排列(東->南->西->北)，${drawnFaceDir}的${drawnRelDir}方是「${currentAnswer}」方喔！`;
+                } else {
+                    let dirStr = drawnTurn === '右轉' ? '順時針' : '逆時針';
+                    explanationText.innerText = `面向${drawnFaceDir}，向${drawnTurn}（${dirStr}方向）轉${drawnAngle}個直角（每個直角換一個方向）。答案會是「${currentAnswer}」方。`;
+                }
+            }
+
+            document.getElementById('next-btn-area').classList.remove('hidden');
+        }
+
+        // 下一題或結束
+        function nextQuestion() {
+            if (currentQ < 5) {
+                currentQ++;
+                setupQuestionUI();
+            } else {
+                endGame();
+            }
+        }
+
+        // 結束遊戲顯示成績
+        function endGame() {
+            const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+            
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('time-taken').innerText = timeTaken;
+            
+            const msgEl = document.getElementById('result-message');
+            const certArea = document.getElementById('certificate-area');
+            
+            certArea.classList.add('hidden'); // 預設隱藏證書
+
+            if (score === 5) {
+                msgEl.innerText = "太棒了！你答對了所有問題，獲得榮譽證書！🎉";
+                certArea.classList.remove('hidden');
+                
+                // 設定證書日期
+                const today = new Date();
+                document.getElementById('cert-date').innerText = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+                
+                // 滿分大煙火
+                const duration = 3000;
+                const end = Date.now() + duration;
+
+                (function frame() {
+                    confetti({
+                        particleCount: 5,
+                        angle: 60,
+                        spread: 55,
+                        origin: { x: 0 },
+                        colors: ['#bb0000', '#ffffff']
+                    });
+                    confetti({
+                        particleCount: 5,
+                        angle: 120,
+                        spread: 55,
+                        origin: { x: 1 },
+                        colors: ['#bb0000', '#ffffff']
+                    });
+
+                    if (Date.now() < end) {
+                        requestAnimationFrame(frame);
+                    }
+                }());
+
+            } else if (score >= 3) {
+                msgEl.innerText = "做的不錯！繼續努力練習，下次一定拿滿分！👍";
+            } else {
+                msgEl.innerText = "沒關係，方向感是需要練習的！多試幾次吧！💪";
+            }
+            
+            showPage('page-result');
+        }
+
+        // 重設 App 到題型選擇
+        function resetApp() {
+            showPage('page-select');
+        }
+
+    </script>
+</body>
+</html>
