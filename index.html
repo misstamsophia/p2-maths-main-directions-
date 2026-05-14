@@ -147,9 +147,14 @@
                 <p class="text-lg font-bold text-center text-red-600 mt-4">滿分探險家將獲得特別證書！</p>
             </div>
             <br>
-            <button onclick="showPage('page-select')" class="btn-primary text-2xl font-bold py-4 px-10 rounded-full cursor-pointer">
-                開始探險 <i class="fa-solid fa-arrow-right ml-2"></i>
-            </button>
+            <div class="flex flex-col md:flex-row gap-4 justify-center items-center">
+                <button onclick="showPage('page-select')" class="btn-primary text-2xl font-bold py-4 px-10 rounded-full cursor-pointer">
+                    開始探險 <i class="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+                <button onclick="showLeaderboard()" class="px-8 py-4 bg-white border-4 border-[#8b5a2b] text-[#8b5a2b] font-bold rounded-full hover:bg-[#fffdf5] cursor-pointer text-2xl shadow-md transition-all hover:scale-105">
+                    🏆 排行榜
+                </button>
+            </div>
         </div>
 
         <!-- 頁面 2：題型選擇 -->
@@ -243,10 +248,20 @@
             
             <div id="normal-result" class="text-center w-full">
                 <h2 class="text-4xl font-bold mb-6 text-[#8b5a2b]">探險完成！</h2>
-                <div class="bg-white p-8 rounded-2xl border-4 border-[#d3b88b] mb-8 inline-block w-full max-w-md">
+                <div class="bg-white p-8 rounded-2xl border-4 border-[#d3b88b] mb-8 inline-block w-full max-w-md shadow-lg">
                     <p class="text-2xl mb-4">你的得分：<span id="final-score" class="font-bold text-3xl text-red-600">0</span> / 5</p>
                     <p class="text-xl mb-4 text-gray-600"><i class="fa-regular fa-clock"></i> 完成時間：<span id="time-taken">0</span> 秒</p>
                     <p id="result-message" class="text-xl font-bold mt-6 text-[#c78933]"></p>
+                </div>
+                
+                <!-- 儲存紀錄區塊 -->
+                <div id="save-score-area" class="bg-[#fffdf5] p-6 rounded-xl border-2 border-[#bda88a] mb-8 inline-block w-full max-w-md shadow-inner hidden">
+                    <h3 class="text-xl font-bold mb-3 text-[#4a3b2c]">留下你的探險紀錄！</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="player-name" placeholder="輸入你的名字" class="flex-1 p-3 border-2 border-[#d3b88b] rounded-lg text-lg outline-none focus:border-[#8b5a2b]" maxlength="10">
+                        <button onclick="saveRecord()" class="bg-[#27ae60] text-white px-6 py-3 rounded-lg font-bold hover:bg-[#219653] transition-colors shadow-md">儲存</button>
+                    </div>
+                    <p id="name-error" class="text-sm text-red-500 mt-2 text-left hidden"><i class="fa-solid fa-circle-exclamation"></i> 請輸入名字才能上榜喔！</p>
                 </div>
             </div>
 
@@ -288,6 +303,36 @@
             </div>
         </div>
 
+        <!-- 頁面 5：排行榜 -->
+        <div id="page-leaderboard" class="hidden fade-in flex flex-col items-center w-full">
+            <h2 class="text-4xl font-bold mb-8 text-[#8b5a2b] drop-shadow-sm">🏆 探險家排行榜 🏆</h2>
+            
+            <div class="bg-white/95 p-6 rounded-2xl border-4 border-[#c78933] shadow-xl w-full max-w-2xl mb-8">
+                <div class="overflow-hidden rounded-xl border-2 border-[#d3b88b]">
+                    <table class="w-full text-left border-collapse bg-white">
+                        <thead>
+                            <tr class="bg-[#f4e8c1] text-[#8b5a2b] text-lg">
+                                <th class="p-4 font-bold border-b-2 border-[#d3b88b] w-20 text-center">排名</th>
+                                <th class="p-4 font-bold border-b-2 border-[#d3b88b]">名字</th>
+                                <th class="p-4 font-bold border-b-2 border-[#d3b88b] text-center">分數</th>
+                                <th class="p-4 font-bold border-b-2 border-[#d3b88b] text-right">時間(秒)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-body">
+                            <!-- 動態插入 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="empty-leaderboard-msg" class="text-gray-500 text-xl font-bold my-10 text-center hidden">
+                    目前還沒有探險紀錄，快去挑戰成為第一名吧！
+                </div>
+            </div>
+
+            <button onclick="showPage('page-intro')" class="px-8 py-3 bg-white border-4 border-[#8b5a2b] text-[#8b5a2b] font-bold rounded-full hover:bg-[#fffdf5] cursor-pointer text-xl shadow-md transition-transform active:translate-y-1">
+                <i class="fa-solid fa-house"></i> 返回首頁
+            </button>
+        </div>
+
     </div>
 
     <script>
@@ -304,6 +349,7 @@
         let currentQ = 1;
         let score = 0;
         let startTime = 0;
+        let finalTime = 0; // 新增：紀錄完成花費總時間
         let currentAnswer = "";
         
         // 當前題目的抽籤結果
@@ -317,10 +363,11 @@
 
         // 顯示指定頁面
         function showPage(pageId) {
-            document.getElementById('page-intro').classList.add('hidden');
-            document.getElementById('page-select').classList.add('hidden');
-            document.getElementById('page-game').classList.add('hidden');
-            document.getElementById('page-result').classList.add('hidden');
+            const pages = ['page-intro', 'page-select', 'page-game', 'page-result', 'page-leaderboard'];
+            pages.forEach(p => {
+                const el = document.getElementById(p);
+                if(el) el.classList.add('hidden');
+            });
             
             document.getElementById(pageId).classList.remove('hidden');
         }
@@ -540,15 +587,20 @@
 
         // 結束遊戲顯示成績
         function endGame() {
-            const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+            finalTime = Math.floor((Date.now() - startTime) / 1000);
             
             document.getElementById('final-score').innerText = score;
-            document.getElementById('time-taken').innerText = timeTaken;
+            document.getElementById('time-taken').innerText = finalTime;
             
             const msgEl = document.getElementById('result-message');
             const certArea = document.getElementById('certificate-area');
+            const saveArea = document.getElementById('save-score-area');
             
             certArea.classList.add('hidden'); // 預設隱藏證書
+            saveArea.classList.remove('hidden'); // 顯示儲存紀錄表單
+            document.getElementById('player-name').value = '';
+            document.getElementById('player-name').classList.remove('border-red-500');
+            document.getElementById('name-error').classList.add('hidden');
 
             if (score === 5) {
                 msgEl.innerText = "太棒了！你答對了所有問題，獲得榮譽證書！🎉";
@@ -590,6 +642,99 @@
             }
             
             showPage('page-result');
+        }
+
+        // 排行榜相關功能
+        function saveRecord() {
+            const nameInput = document.getElementById('player-name');
+            const nameVal = nameInput.value.trim();
+            const errorMsg = document.getElementById('name-error');
+
+            if (!nameVal) {
+                nameInput.classList.add('border-red-500');
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+            
+            nameInput.classList.remove('border-red-500');
+            errorMsg.classList.add('hidden');
+
+            // 建立新紀錄
+            const record = {
+                name: nameVal,
+                score: score,
+                time: finalTime,
+                date: new Date().toLocaleDateString()
+            };
+
+            // 取得現有紀錄
+            let leaderboard = JSON.parse(localStorage.getItem('compassLeaderboard')) || [];
+            leaderboard.push(record);
+
+            // 排序邏輯：1. 分數由高到低 (b.score - a.score) 2. 時間由少到多 (a.time - b.time)
+            leaderboard.sort((a, b) => {
+                if (b.score !== a.score) {
+                    return b.score - a.score;
+                }
+                return a.time - b.time;
+            });
+
+            // 只保留前 50 名
+            leaderboard = leaderboard.slice(0, 50);
+
+            // 儲存回 LocalStorage
+            localStorage.setItem('compassLeaderboard', JSON.stringify(leaderboard));
+
+            // 隱藏輸入區塊並跳轉排行榜
+            document.getElementById('save-score-area').classList.add('hidden');
+            showLeaderboard();
+        }
+
+        function showLeaderboard() {
+            showPage('page-leaderboard');
+            renderLeaderboard();
+        }
+
+        function renderLeaderboard() {
+            const tbody = document.getElementById('leaderboard-body');
+            const emptyMsg = document.getElementById('empty-leaderboard-msg');
+            const table = tbody.parentElement;
+            
+            let leaderboard = JSON.parse(localStorage.getItem('compassLeaderboard')) || [];
+
+            tbody.innerHTML = '';
+
+            if (leaderboard.length === 0) {
+                emptyMsg.classList.remove('hidden');
+                table.classList.add('hidden');
+            } else {
+                emptyMsg.classList.add('hidden');
+                table.classList.remove('hidden');
+                
+                leaderboard.forEach((record, index) => {
+                    let rankDisplay = `<span class="text-xl font-black text-gray-500">${index + 1}</span>`;
+                    let rowClass = "border-b border-gray-100 hover:bg-[#fffdf5] transition-colors";
+                    
+                    if (index === 0) {
+                        rankDisplay = '<i class="fa-solid fa-medal text-3xl text-yellow-400 drop-shadow-md"></i>';
+                        rowClass = "border-b-2 border-yellow-200 bg-yellow-50 hover:bg-yellow-100 transition-colors";
+                    } else if (index === 1) {
+                        rankDisplay = '<i class="fa-solid fa-medal text-3xl text-gray-400 drop-shadow-md"></i>';
+                        rowClass = "border-b border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors";
+                    } else if (index === 2) {
+                        rankDisplay = '<i class="fa-solid fa-medal text-3xl text-amber-700 drop-shadow-md"></i>';
+                        rowClass = "border-b border-orange-100 bg-orange-50 hover:bg-orange-100 transition-colors";
+                    }
+
+                    const row = `<tr class="${rowClass}">
+                        <td class="p-4 text-center">${rankDisplay}</td>
+                        <td class="p-4 font-bold text-[#4a3b2c] text-xl">${record.name}</td>
+                        <td class="p-4 text-center font-black text-red-500 text-2xl">${record.score}</td>
+                        <td class="p-4 text-right text-gray-600 font-mono text-lg">${record.time} s</td>
+                    </tr>`;
+                    tbody.innerHTML += row;
+                });
+            }
         }
 
         // 重設 App 到題型選擇
